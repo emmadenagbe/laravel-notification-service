@@ -1,0 +1,77 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    image: notification-service-app
+    container_name: notification_app
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./:/var/www
+    networks:
+      - notif-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: notification_nginx
+    restart: unless-stopped
+    ports:
+      - "4090:80"
+    volumes:
+      - ./:/var/www
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d
+    depends_on:
+      - app
+    networks:
+      - notif-network
+
+  db:
+    image: postgres:15
+    container_name: notification_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "4054:5432"
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    networks:
+      - notif-network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: notification_rabbitmq
+    restart: unless-stopped
+    ports:
+      - "4672:5672"
+      - "4673:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    networks:
+      - notif-network
+
+  queue-worker:
+    image: notification-service-app
+    container_name: notification_queue
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./:/var/www
+    depends_on:
+      - app
+      - db
+      - rabbitmq
+    command: php artisan queue:work rabbitmq --tries=3 --timeout=90
+    networks:
+      - notif-network
+
+networks:
+  notif-network:
+    driver: bridge
+
+volumes:
+  dbdata:
