@@ -8,7 +8,6 @@ class NotificationController extends Controller
 {
     public function store(\App\Http\Requests\CreateNotificationApiRequest $request, \Core\Application\UseCases\CreateNotificationUseCase $useCase)
     {
-        // Data is already validated by the FormRequest
         $validated = $request->validated();
 
         $dto = new \Core\Application\DTOs\CreateNotificationRequest(
